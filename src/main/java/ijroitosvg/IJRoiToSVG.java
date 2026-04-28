@@ -1,15 +1,20 @@
-
-
 package ijroitosvg;
 
 import java.awt.Polygon;
 import java.awt.Rectangle;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.Prefs;
 import ij.gui.OvalRoi;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
+import ij.io.SaveDialog;
 import ij.plugin.PlugIn;
 import ij.plugin.frame.RoiManager;
 import ij.process.FloatPolygon;
@@ -19,7 +24,7 @@ public class IJRoiToSVG implements PlugIn
 	
 	boolean bSetStrokeWidth = false;
 	
-	float fStrokeWidth = 1;
+	float fStrokeWidth = 0.2f;
 	
 	String sStrokeAdd = "";
 
@@ -27,11 +32,11 @@ public class IJRoiToSVG implements PlugIn
 	public void run( String arg )
 	{
 		final ImagePlus imp = IJ.getImage();
-		
+
 		if (imp == null)
 		{
-		    IJ.noImage();
-		    return;
+			IJ.noImage();
+			return;
 		}
 		RoiManager rm = RoiManager.getInstance();
 		if (rm == null) 
@@ -39,23 +44,46 @@ public class IJRoiToSVG implements PlugIn
 			IJ.showMessage( "ROIs in ROI manager." );
 			return;
 		}
+
+		String filename = getTimestamp() + "_IJroisToSVG";
+		String lastDir = Prefs.get( "IJRoiToSVG.lastDir", "" );
+		SaveDialog sd = new SaveDialog("Save ROIs as SVG", lastDir, filename, ".svg");
+		String path = sd.getDirectory();
+		if (path == null)
+			return;
+		lastDir = path;
+		Prefs.set( "IJRoiToSVG.lastDir", lastDir );
+		filename = path + sd.getFileName();
 		final Roi[] rois = rm.getRoisAsArray();
-		
+
 		String out = exportSvg( rois, imp.getWidth(), imp.getHeight());
+
+		try {
+			final File file = new File(filename);
+
+			try (FileWriter writer = new FileWriter(file))
+			{
+				writer.write( out );
+				writer.close();
+			}
+		} catch (IOException e) {	
+			IJ.log(e.getMessage());
+
+		}
 	}
 	
-	String exportSvg(Roi[] rois, int width, int height) 
+	String exportSvg(final Roi[] rois, final int width, final int height) 
 	{
 	    StringBuilder sb = new StringBuilder();
-
+	    sb.append( "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" );
 	    sb.append(String.format(
-	        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\">\n",
+	        "<svg \nxmlns=\"http://www.w3.org/2000/svg\" \nwidth=\"%d\" \nheight=\"%d\">\n",
 	        width, height
 	    ));
 	    
 	    if(bSetStrokeWidth)
 	    {
-	    	sStrokeAdd = " stroke-width=\""+ Float.toString( fStrokeWidth )+"\"";
+	    	sStrokeAdd = " \nstroke-width=\""+ Float.toString( fStrokeWidth )+"mm\"";
 	    }
 	    for (Roi roi : rois) {
 	        sb.append("  ").append(roiToSvg(roi)).append("\n");
@@ -79,15 +107,14 @@ public class IJRoiToSVG implements PlugIn
 		default:
 			return pathToSvg(roi);
 		}
-
 	}
 	
 	String rectToSvg(Roi r) 
 	{
 	    Rectangle b = r.getBounds();
 	    return String.format(
-	        "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" " +
-	        "fill=\"none\" stroke=\"black\"" + sStrokeAdd + "/>",
+	        "<rect \nx=\"%d\" \ny=\"%d\" \nwidth=\"%d\" \nheight=\"%d\" " +
+	        "\nfill=\"none\" \nstroke=\"black\"" + sStrokeAdd + "/>",
 	        b.x, b.y, b.width, b.height
 	    );
 	}
@@ -105,7 +132,7 @@ public class IJRoiToSVG implements PlugIn
 	    }
 
 	    return String.format(
-	        "<polygon points=\"%s\" fill=\"none\" stroke=\"black\"" + sStrokeAdd + "/>",
+	        "<polygon \npoints=\"%s\" \nfill=\"none\" \nstroke=\"black\"" + sStrokeAdd + "/>",
 	        points.toString().trim()
 	    );
 	}
@@ -120,8 +147,8 @@ public class IJRoiToSVG implements PlugIn
 	    double ry = b.height / 2.0;
 
 	    return String.format(
-	        "<ellipse cx=\"%.2f\" cy=\"%.2f\" rx=\"%.2f\" ry=\"%.2f\" " +
-	        "fill=\"none\" stroke=\"black\"" + sStrokeAdd + "/>",
+	        "<ellipse \ncx=\"%.2f\" \ncy=\"%.2f\" \nrx=\"%.2f\" \nry=\"%.2f\" " +
+	        "\nfill=\"none\" \nstroke=\"black\"" + sStrokeAdd + "/>",
 	        cx, cy, rx, ry
 	    );
 	}
@@ -132,10 +159,14 @@ public class IJRoiToSVG implements PlugIn
 
 	    StringBuilder d = new StringBuilder();
 
-	    for (int i = 0; i < fp.npoints; i++) {
-	        if (i == 0) {
+	    for (int i = 0; i < fp.npoints; i++) 
+	    {
+	        if (i == 0) 
+	        {
 	            d.append(String.format("M %.2f %.2f ", fp.xpoints[i], fp.ypoints[i]));
-	        } else {
+	        } 
+	        else 
+	        {
 	            d.append(String.format("L %.2f %.2f ", fp.xpoints[i], fp.ypoints[i]));
 	        }
 	    }
@@ -145,10 +176,28 @@ public class IJRoiToSVG implements PlugIn
 	    }
 
 	    return String.format(
-	        "<path d=\"%s\" fill=\"none\" stroke=\"black\"" + sStrokeAdd + "/>",
+	        "<path \nd=\"%s\" \nfill=\"none\" \nstroke=\"black\"" + sStrokeAdd + "/>",
 	        d.toString()
 	    );
 	}
+	
+    public static String getTimestamp() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
+        return LocalDateTime.now().format(formatter);
+    }
+    
+    Rectangle estimateAllROIsBounds(final Roi[] rois)
+    {
+    	int nW = 0;
+    	int nH = 0;
+    	for (Roi roi : rois) 
+    	{
+    		final Rectangle rect = roi.getBounds();
+    		nW = Math.max( nW, rect.x + rect.width );
+    		nH = Math.max( nH, rect.y + rect.height );
+    	}
+    	return new Rectangle(0, 0, nW, nH);
+    }
 
 	/**
 	 * Main method for debugging.
@@ -158,7 +207,8 @@ public class IJRoiToSVG implements PlugIn
 	 *
 	 * @param args unused
 	 */
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) throws Exception 
+	{
 
 	}
 
