@@ -11,7 +11,7 @@
 
 	<groupId>nl.uu.science.cellbiology</groupId>       
 	<artifactId>IJRoiToSVG</artifactId> 
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 
 	<name>IJRoiToSVG</name>                                                   
 	<description>ImageJ plugin to convert ROIs to SVG file.</description> 

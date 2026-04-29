@@ -80,6 +80,7 @@ public class IJRoiToSVG implements PlugIn
 		gdParams.addNumericField( "height: ", canvasH );
 		gdParams.addStringField( "Output units", sUnits );
 		gdParams.addNumericField( "Border around: ", fBorder );
+		gdParams.addCheckbox( "Center output" , bCentered );
 		final TextField nfWidth  = (TextField) gdParams.getNumericFields().get( 0 );
 		final TextField nfHeight = (TextField) gdParams.getNumericFields().get( 1 );
 
@@ -96,7 +97,7 @@ public class IJRoiToSVG implements PlugIn
 			nfHeight.setText( "297");
 			tfUnits.setText( "mm" );	
 		});
-		gdParams.addCheckbox( "Center output" , bCentered );
+
 		gdParams.pack();
 		gdParams.showDialog();
 		
