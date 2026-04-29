@@ -1,5 +1,6 @@
 package ijroitosvg;
 
+import java.awt.Color;
 import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.io.File;
@@ -23,25 +24,17 @@ import ij.process.FloatPolygon;
 public class IJRoiToSVG implements PlugIn 
 {
 	
-	boolean bSetStrokeWidth = false;
-	
-	float fStrokeWidth = 0.2f;
-	
-	String sStrokeAdd = "";
-	
 	boolean bUseImage = false;
 	
-	float fScaleFactorX = 1.0f;
-	
-	float fScaleFactorY = 1.0f;	
-	
+	float fScaleFactor = 1.0f;
+
 	String sUnits = "mm";
 	
 	boolean bRescale = true;
 	
-	int rescaledX = 297;
+	int rescaledX = 287;
 	
-	int rescaledY = 210;
+	int rescaledY = 200;
 
 	@Override
 	public void run( String arg )
@@ -56,6 +49,7 @@ public class IJRoiToSVG implements PlugIn
 		
 		int nWOut = 1;
 		int nHOut = 1;
+		
 		if(bUseImage)
 		{
 			final ImagePlus imp = IJ.getImage();
@@ -87,8 +81,7 @@ public class IJRoiToSVG implements PlugIn
 		if(bRescale)
 		{
 			float fFactor = Math.min(rescaledX/(float)nWOut, rescaledY/(float)nHOut);
-			fScaleFactorX = fFactor;
-			fScaleFactorY = fFactor;
+			fScaleFactor = fFactor;
 			nWOut = rescaledX;
 			nHOut = rescaledY;
 		}
@@ -119,14 +112,10 @@ public class IJRoiToSVG implements PlugIn
 	        +">\n",
 	        width, height, width, height
 	    ));
-	    
-	    if(bSetStrokeWidth)
-	    {
-	    	sStrokeAdd = " \n    stroke-width=\""+ Float.toString( fStrokeWidth )+"mm\"";
-	    }
+
 	    for (Roi roi : rois) {
 	        sb.append("  ").append(roiToSvg(roi))
-	        .append( "\n    id=\""+roi.getName()+"\"" )
+	        .append( "\n    id=\"" + roi.getName() + "\"" )
 	        .append( "/>\n");
 	    }
 
@@ -150,49 +139,53 @@ public class IJRoiToSVG implements PlugIn
 		}
 	}
 	
-	String rectToSvg(Roi r) 
+	String rectToSvg(final Roi roi) 
 	{
-	    Rectangle b = r.getBounds();
+	    Rectangle b = roi.getBounds();
 	    return String.format(
-	        "<rect \n    x=\"%.2f\" \n    y=\"%.2f\" \n    width=\"%.2f\" \n    height=\"%.2f\" " +
-	        "\n    fill=\"none\" \n    stroke=\"black\"" + sStrokeAdd,
-	        b.x * fScaleFactorX, b.y * fScaleFactorY, b.width * fScaleFactorX, b.height *fScaleFactorY 
+	        "<rect \n    x=\"%.2f\" \n    y=\"%.2f\" \n    width=\"%.2f\" \n    height=\"%.2f\" "
+	        + getROIColorFillStroke (roi),
+	        b.x * fScaleFactor, 
+	        b.y * fScaleFactor, 
+	        b.width  * fScaleFactor, 
+	        b.height * fScaleFactor
 	    );
 	}
 	
-	String polygonToSvg(PolygonRoi r) 
+	String polygonToSvg(final PolygonRoi roi) 
 	{
-	    Polygon p = r.getPolygon();
+	    Polygon p = roi.getPolygon();
 
 	    StringBuilder points = new StringBuilder();
 	    for (int i = 0; i < p.npoints; i++) {
-	        points.append(String.format("%.2f,",p.xpoints[i] * fScaleFactorX))
-	        	  .append(String.format("%.2f ",p.ypoints[i] * fScaleFactorY));
+	        points.append(String.format("%.2f,",p.xpoints[i] * fScaleFactor))
+	        	  .append(String.format("%.2f ",p.ypoints[i] * fScaleFactor));
 	    }
 
 	    return String.format(
-	        "<polygon \n    points=\"%s\" \n    fill=\"none\" \n    stroke=\"black\"" + sStrokeAdd,
+	        "<polygon \n    points=\"%s\""
+       		+ getROIColorFillStroke (roi),
 	        points.toString().trim()
 	    );
 	}
 	
-	String ovalToSvg(OvalRoi r) 
+	String ovalToSvg(final OvalRoi roi) 
 	{
-	    Rectangle b = r.getBounds();
+	    Rectangle b = roi.getBounds();
 
-	    double cx = ( b.x + b.width / 2.0 )  * fScaleFactorX;
-	    double cy = (b.y + b.height / 2.0 ) *  fScaleFactorY;
-	    double rx = b.width / 2.0   * fScaleFactorX;
-	    double ry = b.height / 2.0 *  fScaleFactorY;
+	    double cx = ( b.x + b.width / 2.0 )  * fScaleFactor;
+	    double cy = (b.y + b.height / 2.0 ) *  fScaleFactor;
+	    double rx = b.width / 2.0   * fScaleFactor;
+	    double ry = b.height / 2.0 *  fScaleFactor;
 
 	    return String.format(
-	        "<ellipse \n    cx=\"%.2f\" \n    cy=\"%.2f\" \n    rx=\"%.2f\" \n    ry=\"%.2f\" " +
-	        "\n    fill=\"none\" \n    stroke=\"black\"" + sStrokeAdd,
+	        "<ellipse \n    cx=\"%.2f\" \n    cy=\"%.2f\" \n    rx=\"%.2f\" \n    ry=\"%.2f\" " 
+	        + getROIColorFillStroke (roi),
 	        cx, cy, rx, ry
 	    );
 	}
 	
-	String pathToSvg(Roi roi) 
+	String pathToSvg(final Roi roi) 
 	{
 	    FloatPolygon fp = roi.getFloatPolygon();
 
@@ -202,11 +195,11 @@ public class IJRoiToSVG implements PlugIn
 	    {
 	        if (i == 0) 
 	        {
-	            d.append(String.format("M %.2f %.2f ", fp.xpoints[i] * fScaleFactorX, fp.ypoints[i] * fScaleFactorY));
+	            d.append(String.format("M %.2f %.2f ", fp.xpoints[i] * fScaleFactor, fp.ypoints[i] * fScaleFactor));
 	        } 
 	        else 
 	        {
-	            d.append(String.format("L %.2f %.2f ", fp.xpoints[i] * fScaleFactorX, fp.ypoints[i] * fScaleFactorY));
+	            d.append(String.format("L %.2f %.2f ", fp.xpoints[i] * fScaleFactor, fp.ypoints[i] * fScaleFactor));
 	        }
 	    }
 
@@ -215,8 +208,9 @@ public class IJRoiToSVG implements PlugIn
 	    }
 
 	    return String.format(
-	        "<path \n    d=\"%s\" \n    fill=\"none\" \n    stroke=\"black\"" + sStrokeAdd,
-	        d.toString()
+	        "<path \n    d=\"%s\"" 
+	        + getROIColorFillStroke (roi),
+ 	        d.toString()
 	    );
 	}
 	
@@ -225,6 +219,45 @@ public class IJRoiToSVG implements PlugIn
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
         return LocalDateTime.now().format(formatter);
     }
+    
+    String getROIColorFillStroke(final Roi roi)
+    {
+    	return getROIFillString( roi ) + getROIStrokeColorString( roi ) + getROIStrokeWidthString( roi );
+    }
+    
+    String getROIStrokeColorString(final Roi roi)
+    {
+		Color color = roi.getStrokeColor();
+		if(color == null)
+		{
+			color = Roi.getColor();
+		}
+		return  "\n    stroke=\"" + String.format("#%02x%02x%02x", 
+                color.getRed(), 
+                color.getGreen(), 
+                color.getBlue()) + "\"";
+    }
+    
+    String getROIStrokeWidthString(final Roi roi)
+    {
+    	float fStrokeWidth = Math.max( roi.getStrokeWidth(), 1.0f);
+    	return " \n    stroke-width=\"" + String.format( "%.2f", fStrokeWidth * fScaleFactor ) + "\"";
+    }
+
+    String getROIFillString(final Roi roi)
+    {
+    	Color color = roi.getFillColor();
+    	if( color == null)
+    	{
+    		return "\n    fill=\"none\" ";
+    	}
+    	
+    	return "\n    fill=\"" + String.format("#%02x%02x%02x", 
+                color.getRed(), 
+                color.getGreen(), 
+                color.getBlue()) + "\"";
+    }
+
     
     Rectangle estimateAllROIsBounds(final Roi[] rois)
     {
@@ -251,12 +284,14 @@ public class IJRoiToSVG implements PlugIn
 	{
 		new ImageJ();
 		ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/test.tif");
+		//ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/gen_art.tif");
 		image.show();
 		RoiManager rm = RoiManager.getInstance2();
 		if (rm == null) {
 		    rm = new RoiManager(); // creates a new one if needed
 		}
-		rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/RoiSet.zip" );
+		rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/RoiSet2.zip" );
+		//rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/gen_art_RoiSet.zip" );
 		// run the plugin
 		IJ.runPlugIn(IJRoiToSVG.class.getName(), "");
 	}
