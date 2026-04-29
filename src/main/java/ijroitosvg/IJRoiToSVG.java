@@ -3,6 +3,7 @@ package ijroitosvg;
 import java.awt.Color;
 import java.awt.Polygon;
 import java.awt.Rectangle;
+import java.awt.TextField;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.Prefs;
+import ij.gui.GenericDialog;
 import ij.gui.OvalRoi;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
@@ -34,6 +36,8 @@ public class IJRoiToSVG implements PlugIn
 	
 	boolean bCentered = Prefs.get( "IJRoiToSVG.bCentered",  true); 
 	
+	boolean bImagePresent = true;
+	
 	boolean bUseImage = false;
 	
 	float fShiftX = 0;
@@ -49,28 +53,90 @@ public class IJRoiToSVG implements PlugIn
 		RoiManager rm = RoiManager.getInstance();
 		if (rm == null) 
 		{
-			IJ.showMessage( "ROIs in ROI manager." );
+			IJ.showMessage( "No ROIs in ROI manager." );
 			return;
 		}
+		else if(rm.getCount() == 0)
+		{
+			IJ.showMessage( "No ROIs in ROI manager." );
+			return;			
+		}
+		final ImagePlus imp = IJ.getImage();
+		
+		if (imp == null)
+		{
+			bImagePresent = false;
+			bUseImage = false;
+		}
+		final GenericDialog gdParams = new GenericDialog( "ROIs to SVG converter" );
+		
+		final String [] inputSize = new String[] {"ROIs boinding box", "Current image"};
+		if(bImagePresent)
+		{	
+			gdParams.addChoice( "Area", inputSize,  Prefs.get( "IJRoiToSVG.inputSize", inputSize[0]) );
+		}
+		gdParams.addMessage( "Output canvas size:" );
+		gdParams.addNumericField( "width: ", canvasW );
+		gdParams.addNumericField( "height: ", canvasH );
+		gdParams.addStringField( "Output units", sUnits );
+		gdParams.addNumericField( "Border around: ", fBorder );
+		final TextField nfWidth  = (TextField) gdParams.getNumericFields().get( 0 );
+		final TextField nfHeight = (TextField) gdParams.getNumericFields().get( 1 );
+
+		final TextField tfUnits  = (TextField) gdParams.getStringFields().get( 0 );
+		gdParams.addButton( "Set output A4 landscape", (e)->
+		{
+			nfWidth.setText( "297");
+			nfHeight.setText( "210");
+			tfUnits.setText( "mm" );
+		} );
+		gdParams.addButton( "Set output A4 portrait", (e) ->
+		{
+			nfWidth.setText( "210");
+			nfHeight.setText( "297");
+			tfUnits.setText( "mm" );	
+		});
+		gdParams.addCheckbox( "Center output" , bCentered );
+		gdParams.pack();
+		gdParams.showDialog();
+		
+		if ( gdParams.wasCanceled() )
+			return;
+		
+		if(bImagePresent)
+		{
+			int inputN = gdParams.getNextChoiceIndex();
+			Prefs.set( "IJRoiToSVG.inputSize", inputSize[inputN]);
+			if(inputN == 1)
+			{
+				bUseImage = true;
+			}
+		}	
+		canvasW = (int) Math.round( gdParams.getNextNumber());
+		Prefs.set( "IJRoiToSVG.canvasW",  (double)canvasW);
+		
+		canvasH = (int) Math.round( gdParams.getNextNumber());
+		Prefs.set( "IJRoiToSVG.canvasH",  (double)canvasH);
+		
+		sUnits = gdParams.getNextString();
+		Prefs.get( "IJRoiToSVG.sUnits", sUnits );
+		
+		fBorder = ( float ) gdParams.getNextNumber();
+		Prefs.set( "IJRoiToSVG.fBorder",  fBorder);
+		
+		bCentered = gdParams.getNextBoolean();
+		Prefs.get( "IJRoiToSVG.bCentered",  bCentered); 
 		
 		int nWOut = 1;
 		int nHOut = 1;
 		
 		Rectangle bounds = new Rectangle (0,0,1,1);
-		if(bUseImage)
+		if(bUseImage && imp != null)
 		{
-			final ImagePlus imp = IJ.getImage();
-	
-			if (imp == null)
-			{
-				IJ.noImage();
-				return;
-			}
 			nWOut = imp.getWidth();
 			nHOut = imp.getHeight();
 			bounds = new Rectangle (0, 0, nWOut, nHOut);
-		}
-		
+		}		
 		
 		String filename = getTimestamp() + "_IJroisToSVG";
 		String lastDir = Prefs.get( "IJRoiToSVG.lastDir", "" );
