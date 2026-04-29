@@ -16,7 +16,8 @@ Or search for this name in _Plugins -> Utilities -> Find Commands..._
 Before running the plugin, make sure you have at least one ROI in the [ROI Manager](https://imagej.net/ij/docs/menus/analyze.html#manager).  
 Optionally, you can have an image open.    
 After the plugin starts, the following dialog appears:   
-<img width="355" height="445" alt="parameters dialog" src="https://github.com/user-attachments/assets/810ed284-186e-4580-a9f8-40261339a8a5" />  
+<img width="347" height="433" alt="parameters dialog" src="https://github.com/user-attachments/assets/c7fbabb1-f432-4972-80f2-a27e8bb6d2b8" />
+ 
 
 The parameters are:
 * **Area**, the input exported area that would be mapped to the final output canvas. It can be set to the current image or to the bounding boxes of all ROIs.
