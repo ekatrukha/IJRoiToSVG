@@ -23,18 +23,24 @@ import ij.process.FloatPolygon;
 
 public class IJRoiToSVG implements PlugIn 
 {
+
+	String sUnits = Prefs.get( "IJRoiToSVG.sUnits", "mm" );
+	
+	float fBorder = ( float ) Prefs.get( "IJRoiToSVG.fBorder",  10.0); 
+	
+	int canvasW = ( int ) Prefs.get( "IJRoiToSVG.canvasW",  297.0);
+	
+	int canvasH = ( int ) Prefs.get( "IJRoiToSVG.canvasH",  210.0);
+	
+	boolean bCentered = Prefs.get( "IJRoiToSVG.bCentered",  true); 
 	
 	boolean bUseImage = false;
 	
+	float fShiftX = 0;
+	
+	float fShiftY = 0;
+	
 	float fScaleFactor = 1.0f;
-
-	String sUnits = "mm";
-	
-	boolean bRescale = true;
-	
-	int rescaledX = 287;
-	
-	int rescaledY = 200;
 
 	@Override
 	public void run( String arg )
@@ -50,6 +56,7 @@ public class IJRoiToSVG implements PlugIn
 		int nWOut = 1;
 		int nHOut = 1;
 		
+		Rectangle bounds = new Rectangle (0,0,1,1);
 		if(bUseImage)
 		{
 			final ImagePlus imp = IJ.getImage();
@@ -61,7 +68,10 @@ public class IJRoiToSVG implements PlugIn
 			}
 			nWOut = imp.getWidth();
 			nHOut = imp.getHeight();
+			bounds = new Rectangle (0, 0, nWOut, nHOut);
 		}
+		
+		
 		String filename = getTimestamp() + "_IJroisToSVG";
 		String lastDir = Prefs.get( "IJRoiToSVG.lastDir", "" );
 		SaveDialog sd = new SaveDialog("Save ROIs as SVG", lastDir, filename, ".svg");
@@ -74,20 +84,27 @@ public class IJRoiToSVG implements PlugIn
 		final Roi[] rois = rm.getRoisAsArray();
 		if(!bUseImage)
 		{
-			final Rectangle bounds = estimateAllROIsBounds(rois);
+			bounds = estimateAllROIsBounds(rois);
 			nWOut = bounds.width;
 			nHOut = bounds.height;		
 		}
-		if(bRescale)
+		
+		//calculate scaling factor
+		fScaleFactor = Math.min((canvasW - 2.0f * fBorder)/nWOut, (canvasH - 2.0f * fBorder)/nHOut);
+		
+		fShiftX = fBorder - bounds.x * fScaleFactor;
+		fShiftY = fBorder - bounds.y * fScaleFactor;
+		
+		if(bCentered)
 		{
-			float fFactor = Math.min(rescaledX/(float)nWOut, rescaledY/(float)nHOut);
-			fScaleFactor = fFactor;
-			nWOut = rescaledX;
-			nHOut = rescaledY;
+			fShiftX += 0.5f * (canvasW - (nWOut * fScaleFactor + 2.0f * fBorder) ); 
+			fShiftY += 0.5f * (canvasH - (nHOut * fScaleFactor + 2.0f * fBorder) ); 
 		}
-		String out = exportSvg( rois, nWOut, nHOut);
 
-		try {
+		String out = exportSvg( rois, canvasW, canvasH);
+
+		try 
+		{
 			final File file = new File(filename);
 
 			try (FileWriter writer = new FileWriter(file))
@@ -113,7 +130,8 @@ public class IJRoiToSVG implements PlugIn
 	        width, height, width, height
 	    ));
 
-	    for (Roi roi : rois) {
+	    for (Roi roi : rois) 
+	    {
 	        sb.append("  ").append(roiToSvg(roi))
 	        .append( "\n    id=\"" + roi.getName() + "\"" )
 	        .append( "/>\n");
@@ -145,8 +163,8 @@ public class IJRoiToSVG implements PlugIn
 	    return String.format(
 	        "<rect \n    x=\"%.2f\" \n    y=\"%.2f\" \n    width=\"%.2f\" \n    height=\"%.2f\" "
 	        + getROIColorFillStroke (roi),
-	        b.x * fScaleFactor, 
-	        b.y * fScaleFactor, 
+	        b.x * fScaleFactor + fShiftX, 
+	        b.y * fScaleFactor + fShiftY, 
 	        b.width  * fScaleFactor, 
 	        b.height * fScaleFactor
 	    );
@@ -158,8 +176,8 @@ public class IJRoiToSVG implements PlugIn
 
 	    StringBuilder points = new StringBuilder();
 	    for (int i = 0; i < p.npoints; i++) {
-	        points.append(String.format("%.2f,",p.xpoints[i] * fScaleFactor))
-	        	  .append(String.format("%.2f ",p.ypoints[i] * fScaleFactor));
+	        points.append(String.format("%.2f,",p.xpoints[i] * fScaleFactor + fShiftX))
+	        	  .append(String.format("%.2f ",p.ypoints[i] * fScaleFactor + fShiftY));
 	    }
 
 	    return String.format(
@@ -173,10 +191,10 @@ public class IJRoiToSVG implements PlugIn
 	{
 	    Rectangle b = roi.getBounds();
 
-	    double cx = ( b.x + b.width / 2.0 )  * fScaleFactor;
-	    double cy = (b.y + b.height / 2.0 ) *  fScaleFactor;
+	    double cx = ( b.x + b.width  / 2.0 ) *  fScaleFactor + fShiftX;
+	    double cy = ( b.y + b.height / 2.0 ) *  fScaleFactor + fShiftY;
 	    double rx = b.width / 2.0   * fScaleFactor;
-	    double ry = b.height / 2.0 *  fScaleFactor;
+	    double ry = b.height / 2.0  * fScaleFactor;
 
 	    return String.format(
 	        "<ellipse \n    cx=\"%.2f\" \n    cy=\"%.2f\" \n    rx=\"%.2f\" \n    ry=\"%.2f\" " 
@@ -195,11 +213,11 @@ public class IJRoiToSVG implements PlugIn
 	    {
 	        if (i == 0) 
 	        {
-	            d.append(String.format("M %.2f %.2f ", fp.xpoints[i] * fScaleFactor, fp.ypoints[i] * fScaleFactor));
+	            d.append(String.format("M %.2f %.2f ", fp.xpoints[i] * fScaleFactor + fShiftX, fp.ypoints[i] * fScaleFactor + fShiftY));
 	        } 
 	        else 
 	        {
-	            d.append(String.format("L %.2f %.2f ", fp.xpoints[i] * fScaleFactor, fp.ypoints[i] * fScaleFactor));
+	            d.append(String.format("L %.2f %.2f ", fp.xpoints[i] * fScaleFactor + fShiftX, fp.ypoints[i] * fScaleFactor + fShiftY));
 	        }
 	    }
 
@@ -261,15 +279,20 @@ public class IJRoiToSVG implements PlugIn
     
     Rectangle estimateAllROIsBounds(final Roi[] rois)
     {
-    	int nW = 0;
-    	int nH = 0;
+    	int nXmax = 0;
+    	int nYmax = 0;
+    	int nXmin = Integer.MAX_VALUE;
+    	int nYmin = Integer.MAX_VALUE;
+
     	for (Roi roi : rois) 
     	{
     		final Rectangle rect = roi.getBounds();
-    		nW = Math.max( nW, rect.x + rect.width );
-    		nH = Math.max( nH, rect.y + rect.height );
+    		nXmax = Math.max( nXmax, rect.x + rect.width );
+    		nYmax = Math.max( nYmax, rect.y + rect.height );
+    		nXmin = Math.min( nXmin, rect.x );
+    		nYmin = Math.min( nYmin, rect.y );
     	}
-    	return new Rectangle(0, 0, nW, nH);
+    	return new Rectangle(nXmin, nYmin, nXmax - nXmin, nYmax - nYmin);
     }
 
 	/**
@@ -283,15 +306,15 @@ public class IJRoiToSVG implements PlugIn
 	public static void main(String[] args) throws Exception 
 	{
 		new ImageJ();
-		ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/test.tif");
-		//ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/gen_art.tif");
+		//ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/test.tif");
+		ImagePlus image = IJ.openImage("/home/eugene/Desktop/projects/IJROIsToSVG/gen_art.tif");
 		image.show();
 		RoiManager rm = RoiManager.getInstance2();
 		if (rm == null) {
 		    rm = new RoiManager(); // creates a new one if needed
 		}
-		rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/RoiSet2.zip" );
-		//rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/gen_art_RoiSet.zip" );
+		//rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/RoiSet2.zip" );
+		rm.open( "/home/eugene/Desktop/projects/IJROIsToSVG/gen_art_RoiSet.zip" );
 		// run the plugin
 		IJ.runPlugIn(IJRoiToSVG.class.getName(), "");
 	}
